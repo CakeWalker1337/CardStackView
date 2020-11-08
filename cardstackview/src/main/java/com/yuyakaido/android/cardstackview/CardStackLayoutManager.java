@@ -352,7 +352,7 @@ public class CardStackLayoutManager
         }
 
         if (state.status.isDragging()) {
-            listener.onCardDragging(state.getDirection(), state.getRatio());
+            listener.onCardDragging(state.getDirectionX(), state.getDirectionY(), state.getRatioX(), state.getRatioY());
         }
     }
 
@@ -483,27 +483,36 @@ public class CardStackLayoutManager
         if (bottomOverlay != null) {
             bottomOverlay.setAlpha(0.0f);
         }
-        Direction direction = state.getDirection();
-        float alpha = setting.overlayInterpolator.getInterpolation(state.getRatio());
-        switch (direction) {
+        Direction directionX = state.getDirectionX();
+        Direction directionY = state.getDirectionY();
+        float alphaX = setting.overlayInterpolator.getInterpolation(state.getRatioX());
+        float alphaY = setting.overlayInterpolator.getInterpolation(state.getRatioY());
+        float restrictionVector = (float) Math.hypot(alphaX, alphaY);
+        float reduceCoefficient = 1.0F;
+        if(restrictionVector > 1.0F){
+            reduceCoefficient = 1.0F / restrictionVector;
+        }
+        switch (directionX) {
             case Left:
                 if (leftOverlay != null) {
-                    leftOverlay.setAlpha(alpha);
+                    leftOverlay.setAlpha(alphaX * reduceCoefficient);
                 }
                 break;
             case Right:
                 if (rightOverlay != null) {
-                    rightOverlay.setAlpha(alpha);
+                    rightOverlay.setAlpha(alphaX * reduceCoefficient);
                 }
                 break;
+        }
+        switch (directionY) {
             case Top:
                 if (topOverlay != null) {
-                    topOverlay.setAlpha(alpha);
+                    topOverlay.setAlpha(alphaY * reduceCoefficient);
                 }
                 break;
             case Bottom:
                 if (bottomOverlay != null) {
-                    bottomOverlay.setAlpha(alpha);
+                    bottomOverlay.setAlpha(alphaY * reduceCoefficient);
                 }
                 break;
         }

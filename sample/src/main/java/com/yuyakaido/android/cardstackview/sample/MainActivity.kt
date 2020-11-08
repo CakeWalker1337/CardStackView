@@ -41,8 +41,8 @@ class MainActivity : AppCompatActivity(), CardStackListener {
         }
     }
 
-    override fun onCardDragging(direction: Direction, ratio: Float) {
-        Log.d("CardStackView", "onCardDragging: d = ${direction.name}, r = $ratio")
+    override fun onCardDragging(directionX: Direction, directionY: Direction, ratioX: Float, ratioY: Float) {
+        Log.d("CardStackView", "onCardDragging: dx = ${directionX.name}, dy = ${directionY.name}, rx = $ratioX, ry = $ratioY")
     }
 
     override fun onCardSwiped(direction: Direction) {

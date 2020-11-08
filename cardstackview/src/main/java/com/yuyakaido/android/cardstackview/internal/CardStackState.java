@@ -53,30 +53,42 @@ public class CardStackState {
 
     public Direction getDirection() {
         if (Math.abs(dy) < Math.abs(dx)) {
-            if (dx < 0.0f) {
-                return Direction.Left;
-            } else {
-                return Direction.Right;
-            }
+            return getDirectionX();
         } else {
-            if (dy < 0.0f) {
-                return Direction.Top;
-            } else {
-                return Direction.Bottom;
-            }
+            return getDirectionY();
         }
     }
 
-    public float getRatio() {
-        int absDx = Math.abs(dx);
-        int absDy = Math.abs(dy);
-        float ratio;
-        if (absDx < absDy) {
-            ratio = absDy / (height / 2.0f);
+    public Direction getDirectionX(){
+        if (dx < 0.0f) {
+            return Direction.Left;
         } else {
-            ratio = absDx / (width / 2.0f);
+            return Direction.Right;
         }
+    }
+
+    public Direction getDirectionY(){
+        if (dy < 0.0f) {
+            return Direction.Top;
+        } else {
+            return Direction.Bottom;
+        }
+    }
+
+    public float getRatioX() {
+        int absDx = Math.abs(dx);
+        float ratio = absDx / (width / 2.0f);
         return Math.min(ratio, 1.0f);
+    }
+
+    public float getRatioY() {
+        int absDy = Math.abs(dy);
+        float ratio = absDy / (height / 2.0f);
+        return Math.min(ratio, 1.0f);
+    }
+
+    public float getRatio() {
+        return Math.max(getRatioX(), getRatioY());
     }
 
     public boolean isSwipeCompleted() {
