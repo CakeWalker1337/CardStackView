@@ -415,7 +415,7 @@ public class CardStackLayoutManager
         float nextScale = 1.0f - nextIndex * (1.0f - setting.scaleInterval);
         float ratio = state.getRatio();
         float targetScale = currentScale + (nextScale - currentScale) * ratio;
-        float cardElevation = (setting.baseCardElevation * ratio + setting.baseCardElevation) * 0.5F;
+        float cardElevation = (setting.baseCardElevation * ratio + setting.baseCardElevation) * 0.45F;
         if(view instanceof CardView){
             view.setElevation(cardElevation);
         }
