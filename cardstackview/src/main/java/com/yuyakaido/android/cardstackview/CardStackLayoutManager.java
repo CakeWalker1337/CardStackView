@@ -10,14 +10,12 @@ import android.view.animation.Interpolator;
 import com.yuyakaido.android.cardstackview.internal.CardStackSetting;
 import com.yuyakaido.android.cardstackview.internal.CardStackSmoothScroller;
 import com.yuyakaido.android.cardstackview.internal.CardStackState;
-import com.yuyakaido.android.cardstackview.internal.DisplayUtil;
 
 import java.util.List;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
-import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 public class CardStackLayoutManager
@@ -49,13 +47,31 @@ public class CardStackLayoutManager
 
     @Override
     public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State s){
-        update(recycler);
-        if(s.didStructureChange()){
-            View topView = getTopView();
-            if(topView != null){
-                listener.onCardAppeared(getTopView(), state.topPosition);
+        initItem(recycler, state.lastPosition);
+    }
+
+    public View initItem(RecyclerView.Recycler recycler, int position){
+        if(position - state.topPosition < setting.visibleCount){
+            final int parentTop = getPaddingTop();
+            final int parentLeft = getPaddingLeft();
+            final int parentRight = getWidth() - getPaddingLeft();
+            final int parentBottom = getHeight() - getPaddingBottom();
+            View child = recycler.getViewForPosition(state.lastPosition);
+            if(state.lastPosition == state.topPosition){
+                updateScale(child);
+            } else{
+                resetScale(child);
             }
+            resetOverlay(child);
+            addView(child, 0);
+            measureChildWithMargins(child, 0, 0);
+            layoutDecoratedWithMargins(child, parentLeft, parentTop, parentRight, parentBottom);
+            state.lastPosition++;
+            View topView = getTopView();
+            listener.onCardAppeared(topView, state.topPosition);
+            return topView;
         }
+        return null;
     }
 
     @Override
@@ -253,62 +269,26 @@ public class CardStackLayoutManager
         state.width = getWidth();
         state.height = getHeight();
 
+        View topView = getTopView();
         if(state.isSwipeCompleted()){
-            // ■ 概要
-            // スワイプが完了したタイミングで、スワイプ済みのViewをキャッシュから削除する
-            // キャッシュの削除を行わないと、次回更新時にスワイプ済みのカードが表示されてしまう
-            // スワイプ済みカードが表示される場合、データソースは正しく、表示だけが古い状態になっている
-            //
-            // ■ 再現手順
-            // 1. `removeAndRecycleView(getTopView(), recycler);`をコメントアウトする
-            // 2. VisibleCount=1に設定し、最後のカードがスワイプされたらページングを行うようにする
-            // 3. カードを1枚だけ画面に表示する（このカードをAとする）
-            // 4. Aをスワイプする
-            // 5. カードを1枚だけ画面に表示する（このカードをBとする）
-            // 6. ページング完了後はBが表示されるはずが、Aが画面に表示される
-            removeAndRecycleView(getTopView(), recycler);
+            resetTranslation(topView);
+            resetScale(topView);
+            resetRotation(topView);
+            resetOverlay(topView);
+            removeAndRecycleView(topView, recycler);
 
             final Direction direction = state.getDirection();
 
             state.next(state.status.toAnimatedStatus());
             state.topPosition++;
+
             state.dx = 0;
             state.dy = 0;
             if(state.topPosition == state.targetPosition){
                 state.targetPosition = RecyclerView.NO_POSITION;
+                initItem(recycler, state.lastPosition);
+                updateScale(getTopView());
             }
-
-            /* Handlerを経由してイベント通知を行っているのは、以下のエラーを回避するため
-             *
-             * 2019-03-31 18:44:29.744 8496-8496/com.yuyakaido.android.cardstackview.sample E/AndroidRuntime: FATAL EXCEPTION: main
-             *     Process: com.yuyakaido.android.cardstackview.sample, PID: 8496
-             *     java.lang.IllegalStateException: Cannot call this method while RecyclerView is computing a layout or scrolling com.yuyakaido.android.cardstackview.CardStackView{9d8ff78 VFED..... .F....ID 0,0-1080,1353 #7f080027 app:id/card_stack_view}, adapter:com.yuyakaido.android.cardstackview.sample.CardStackAdapter@e0b8651, layout:com.yuyakaido.android.cardstackview.CardStackLayoutManager@17b0eb6, context:com.yuyakaido.android.cardstackview.sample.MainActivity@fe550ca
-             *         at android.support.v7.widget.RecyclerView.assertNotInLayoutOrScroll(RecyclerView.java:2880)
-             *         at android.support.v7.widget.RecyclerView$RecyclerViewDataObserver.onItemRangeInserted(RecyclerView.java:5300)
-             *         at android.support.v7.widget.RecyclerView$AdapterDataObservable.notifyItemRangeInserted(RecyclerView.java:12022)
-             *         at android.support.v7.widget.RecyclerView$Adapter.notifyItemRangeInserted(RecyclerView.java:7214)
-             *         at android.support.v7.util.AdapterListUpdateCallback.onInserted(AdapterListUpdateCallback.java:42)
-             *         at android.support.v7.util.BatchingListUpdateCallback.dispatchLastEvent(BatchingListUpdateCallback.java:61)
-             *         at android.support.v7.util.DiffUtil$DiffResult.dispatchUpdatesTo(DiffUtil.java:852)
-             *         at android.support.v7.util.DiffUtil$DiffResult.dispatchUpdatesTo(DiffUtil.java:802)
-             *         at com.yuyakaido.android.cardstackview.sample.MainActivity.paginate(MainActivity.kt:164)
-             *         at com.yuyakaido.android.cardstackview.sample.MainActivity.onCardSwiped(MainActivity.kt:50)
-             *         at com.yuyakaido.android.cardstackview.CardStackLayoutManager.update(CardStackLayoutManager.java:277)
-             *         at com.yuyakaido.android.cardstackview.CardStackLayoutManager.scrollHorizontallyBy(CardStackLayoutManager.java:92)
-             *         at android.support.v7.widget.RecyclerView.scrollStep(RecyclerView.java:1829)
-             *         at android.support.v7.widget.RecyclerView$ViewFlinger.run(RecyclerView.java:5067)
-             *         at android.view.Choreographer$CallbackRecord.run(Choreographer.java:911)
-             *         at android.view.Choreographer.doCallbacks(Choreographer.java:723)
-             *         at android.view.Choreographer.doFrame(Choreographer.java:655)
-             *         at android.view.Choreographer$FrameDisplayEventReceiver.run(Choreographer.java:897)
-             *         at android.os.Handler.handleCallback(Handler.java:789)
-             *         at android.os.Handler.dispatchMessage(Handler.java:98)
-             *         at android.os.Looper.loop(Looper.java:164)
-             *         at android.app.ActivityThread.main(ActivityThread.java:6541)
-             *         at java.lang.reflect.Method.invoke(Native Method)
-             *         at com.android.internal.os.Zygote$MethodAndArgsCaller.run(Zygote.java:240)
-             *         at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:767)
-             */
             new Handler().post(new Runnable(){
 
                 @Override
@@ -320,41 +300,15 @@ public class CardStackLayoutManager
                     }
                 }
             });
-        }
+        } else{
 
-        detachAndScrapAttachedViews(recycler);
+            updateTranslation(topView);
+            updateRotation(topView);
+            updateOverlay(topView);
 
-        final int parentTop = getPaddingTop();
-        final int parentLeft = getPaddingLeft();
-        final int parentRight = getWidth() - getPaddingLeft();
-        final int parentBottom = getHeight() - getPaddingBottom();
-        for(int i = state.topPosition; i < state.topPosition + setting.visibleCount && i < getItemCount(); i++){
-            View child = recycler.getViewForPosition(i);
-            addView(child, 0);
-            measureChildWithMargins(child, 0, 0);
-            layoutDecoratedWithMargins(child, parentLeft, parentTop, parentRight, parentBottom);
-
-            resetTranslation(child);
-            resetScale(child);
-            resetRotation(child);
-            resetOverlay(child);
-
-            if(i == state.topPosition){
-                updateTranslation(child);
-                resetScale(child);
-                updateRotation(child);
-                updateOverlay(child);
-            } else{
-                int currentIndex = i - state.topPosition;
-                updateTranslation(child, currentIndex);
-                updateScale(child, currentIndex);
-                resetRotation(child);
-                resetOverlay(child);
+            if(state.status.isDragging()){
+                listener.onCardDragging(state.getDirectionX(), state.getDirectionY(), state.getRatioX(), state.getRatioY());
             }
-        }
-
-        if(state.status.isDragging()){
-            listener.onCardDragging(state.getDirectionX(), state.getDirectionY(), state.getRatioX(), state.getRatioY());
         }
     }
 
@@ -363,108 +317,18 @@ public class CardStackLayoutManager
         view.setTranslationY(state.dy);
     }
 
-    private void updateTranslation(View view, int index){
-        int nextIndex = index - 1;
-        int translationPx = DisplayUtil.dpToPx(context, setting.translationInterval);
-        float currentTranslation = index * translationPx;
-        float nextTranslation = nextIndex * translationPx;
-        float targetTranslation = currentTranslation - (currentTranslation - nextTranslation) * state.getRatio();
-        switch(setting.stackFrom){
-            case None:
-                // Do nothing
-                break;
-            case Top:
-                view.setTranslationY(-targetTranslation);
-                break;
-            case TopAndLeft:
-                view.setTranslationY(-targetTranslation);
-                view.setTranslationX(-targetTranslation);
-                break;
-            case TopAndRight:
-                view.setTranslationY(-targetTranslation);
-                view.setTranslationX(targetTranslation);
-                break;
-            case Bottom:
-                view.setTranslationY(targetTranslation);
-                break;
-            case BottomAndLeft:
-                view.setTranslationY(targetTranslation);
-                view.setTranslationX(-targetTranslation);
-                break;
-            case BottomAndRight:
-                view.setTranslationY(targetTranslation);
-                view.setTranslationX(targetTranslation);
-                break;
-            case Left:
-                view.setTranslationX(-targetTranslation);
-                break;
-            case Right:
-                view.setTranslationX(targetTranslation);
-                break;
-        }
-    }
-
     private void resetTranslation(View view){
         view.setTranslationX(0.0f);
         view.setTranslationY(0.0f);
     }
 
-    private void updateScale(View view, int index){
-        int nextIndex = index - 1;
-        float currentScale = 1.0f - index * (1.0f - setting.scaleInterval);
-        float nextScale = 1.0f - nextIndex * (1.0f - setting.scaleInterval);
-        float ratio = state.getRatio();
-        float targetScale = currentScale + (nextScale - currentScale) * ratio;
-        float cardElevation = (setting.baseCardElevation * ratio + setting.baseCardElevation) * 0.45F;
-        if(view instanceof CardView){
-            view.setElevation(cardElevation);
-        }
-        switch(setting.stackFrom){
-            case None:
-                view.setScaleX(targetScale);
-                view.setScaleY(targetScale);
-                break;
-            case Top:
-                view.setScaleX(targetScale);
-                // TODO Should handle ScaleY
-                break;
-            case TopAndLeft:
-                view.setScaleX(targetScale);
-                // TODO Should handle ScaleY
-                break;
-            case TopAndRight:
-                view.setScaleX(targetScale);
-                // TODO Should handle ScaleY
-                break;
-            case Bottom:
-                view.setScaleX(targetScale);
-                // TODO Should handle ScaleY
-                break;
-            case BottomAndLeft:
-                view.setScaleX(targetScale);
-                // TODO Should handle ScaleY
-                break;
-            case BottomAndRight:
-                view.setScaleX(targetScale);
-                // TODO Should handle ScaleY
-                break;
-            case Left:
-                // TODO Should handle ScaleX
-                view.setScaleY(targetScale);
-                break;
-            case Right:
-                // TODO Should handle ScaleX
-                view.setScaleY(targetScale);
-                break;
-        }
+    private void updateScale(View view){
+        view.animate().scaleX(1.0F).scaleY(1.0F).setDuration(200L).start();
     }
 
     private void resetScale(View view){
-        view.setScaleX(1.0f);
-        view.setScaleY(1.0f);
-        if(view instanceof CardView){
-            view.setElevation(setting.baseCardElevation);
-        }
+        view.setScaleX(0.9f);
+        view.setScaleY(0.9f);
     }
 
     private void updateRotation(View view){
@@ -572,6 +436,7 @@ public class CardStackLayoutManager
         state.proportion = 0.0f;
         state.targetPosition = position;
         state.topPosition--;
+        state.lastPosition--;
         CardStackSmoothScroller scroller = new CardStackSmoothScroller(CardStackSmoothScroller.ScrollType.AutomaticRewind, this);
         scroller.setTargetPosition(state.topPosition);
         startSmoothScroll(scroller);
@@ -587,10 +452,6 @@ public class CardStackLayoutManager
 
     public void setTopPosition(int topPosition){
         state.topPosition = topPosition;
-    }
-
-    public void setStackFrom(@NonNull StackFrom stackFrom){
-        setting.stackFrom = stackFrom;
     }
 
     public void setVisibleCount(@IntRange(from = 1) int visibleCount){

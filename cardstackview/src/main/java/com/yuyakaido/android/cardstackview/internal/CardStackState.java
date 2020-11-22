@@ -11,6 +11,7 @@ public class CardStackState {
     public int dx = 0;
     public int dy = 0;
     public int topPosition = 0;
+    public int lastPosition = 0;
     public int targetPosition = RecyclerView.NO_POSITION;
     public float proportion = 0.0f;
 
